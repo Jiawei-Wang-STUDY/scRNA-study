@@ -1,0 +1,170 @@
+##系统报错改为英文
+Sys.setenv(LANGUAGE = "en")
+##禁止转化为因子
+options(stringsAsFactors = FALSE)
+##清空环境
+rm(list=ls())
+
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(reshape2)
+library(RColorBrewer)
+library(ggplot2)
+library(ggrepel)  
+library(magrittr)
+library(data.table)
+library(tidyverse)
+
+setwd("E:\\super.lesson\\s8/")
+load("anno.scRNA_harmony.rdata")
+
+scRNA_harmony@meta.data[which(scRNA_harmony@meta.data$orig.ident=="s1"),"group.3"]="c"
+scRNA_harmony@meta.data[which(scRNA_harmony@meta.data$orig.ident=="s2"),"group.3"]="c"
+scRNA_harmony@meta.data[which(scRNA_harmony@meta.data$orig.ident=="s3"),"group.3"]="t"
+scRNA_harmony@meta.data[which(scRNA_harmony@meta.data$orig.ident=="s4"),"group.3"]="t"
+DimPlot(scRNA_harmony,split.by = "group.3",group.by = "celltype.3")
+
+setwd("E:\\super.lesson\\s10/")
+
+
+library('GSEABase')
+library(GSVA)
+library(msigdbr)
+m_df<- msigdbr(species = "human",  category = "H" )
+geneSets <- m_df %>% split(x = .$gene_symbol, f = .$gs_name)
+exp=AverageExpression(scRNA_harmony ) 
+exp=exp[["RNA"]]
+counts2=exp
+?gsva
+
+gsvapar <- gsvaParam(as.matrix(counts2), geneSets)
+
+GSVA_hall <- gsva(gsvapar)
+head(GSVA_hall)
+
+pheatmap::pheatmap(GSVA_hall[1:30,], #热图的数据
+                   cluster_rows = T,#行聚类
+                   cluster_cols =T,#列聚类，可以看出样本之间的区分度
+
+                   show_colnames=T,
+                   scale = "row", #以行来标准化，这个功能很不错
+                   color =colorRampPalette(c("#FF7744", "white","#AAAAAA","#0044BB"))(100))
+
+
+
+exp=AverageExpression(scRNA_harmony,add.ident = "orig.ident") 
+exp=exp[["RNA"]]
+
+counts2=as.matrix( exp ) 
+
+gsvapar <- gsvaParam(as.matrix(counts2), geneSets)
+
+GSVA_hall <- gsva(gsvapar)
+
+head(GSVA_hall)
+
+pheatmap::pheatmap(GSVA_hall[1:30,], #热图的数据
+                   cluster_rows = T,#行聚类
+                   cluster_cols =T,#列聚类，可以看出样本之间的区分度
+
+                   show_colnames=T,
+                   scale = "row", #以行来标准化，这个功能很不错
+                   color =colorRampPalette(c("#FF7744", "white","#AAAAAA","#0044BB"))(100))
+
+
+###########################################################
+###########################################################
+###########################################################
+
+
+library('GSEABase')
+library(GSVA)
+library(msigdbr)
+m_df<- msigdbr(species = "human",  category = "H" )
+geneSets <- m_df %>% split(x = .$gene_symbol, f = .$gs_name)
+exp=AverageExpression(scRNA_harmony,add.ident = "orig.ident") 
+exp=as.matrix( exp[["RNA"]]) 
+
+counts2=exp[,c(1:6)]
+
+gsvapar <- gsvaParam(as.matrix(counts2), geneSets)
+
+GSVA_hall <- gsva(gsvapar)
+head(GSVA_hall)
+
+## limma差异通路分析
+
+#BiocManager::install('limma')
+library(limma)
+# 设置或导入分组
+group <- factor(c(rep("s.11",3), rep("s.3", 3)), levels = c( 's.11','s.3'))
+design <- model.matrix(~0+group)
+colnames(design) = levels(factor(group))
+rownames(design) = colnames(GSVA_hall)
+design
+# Tunor VS Normal
+compare <- makeContrasts(s.3 - s.11, levels=design)
+fit <- lmFit(GSVA_hall, design)
+fit2 <- contrasts.fit(fit, compare)
+fit3 <- eBayes(fit2)
+Diff <- topTable(fit3, coef=1, number=200)
+head(Diff)
+
+## 发散条形图绘制
+## barplot
+dat_plot <- data.frame(id = row.names(Diff),
+                       t = Diff$t)
+# 去掉"HALLMARK_"
+library(stringr)
+dat_plot$id <- str_replace(dat_plot$id , "HALLMARK_","")
+# 新增一列 根据t阈值分类
+dat_plot$threshold = factor(ifelse(dat_plot$t  >-1, ifelse(dat_plot$t >= 1 ,'Up','NoSignifi'),'Down'),levels=c('Up','Down','NoSignifi'))
+# 排序
+dat_plot <- dat_plot %>% arrange(t)
+# 变成因子类型
+dat_plot$id <- factor(dat_plot$id,levels = dat_plot$id)
+# 绘制
+library(ggplot2)
+
+##install.packages("ggthemes")
+library(ggthemes)
+# install.packages("ggprism")
+library(ggprism)
+p <- ggplot(data = dat_plot,aes(x = id,y = t,fill = threshold)) +
+  geom_col()+
+  coord_flip() +
+  scale_fill_manual(values = c('Up'= '#36638a','NoSignifi'='#cccccc','Down'='#7bcd7b')) +
+  geom_hline(yintercept = c(-2,2),color = 'white',size = 0.5,lty='dashed') +
+  xlab('') + 
+  ylab('t value of GSVA score, S.11 VS S.3') + #注意坐标轴旋转了
+  guides(fill=F)+ # 不显示图例
+  theme_prism(border = T) +
+  theme(
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+p
+# 添加标签
+
+# 小于-1的数量
+low1 <- dat_plot %>% filter(t < -1) %>% nrow()
+# 小于0总数量
+low0 <- dat_plot %>% filter( t < 0) %>% nrow()
+# 小于1总数量
+high0 <- dat_plot %>% filter(t < 1) %>% nrow()
+# 总的柱子数量
+high1 <- nrow(dat_plot)
+
+# 依次从下到上添加标签
+p <- p + geom_text(data = dat_plot[1:low1,],aes(x = id,y = 0.1,label = id),
+                   hjust = 0,color = 'black') + # 小于-1的为黑色标签
+  geom_text(data = dat_plot[(low1 +1):low0,],aes(x = id,y = 0.1,label = id),
+            hjust = 0,color = 'grey') + # 灰色标签
+  geom_text(data = dat_plot[(low0 + 1):high0,],aes(x = id,y = -0.1,label = id),
+            hjust = 1,color = 'grey') + # 灰色标签
+  geom_text(data = dat_plot[(high0 +1):high1,],aes(x = id,y = -0.1,label = id),
+            hjust = 1,color = 'black') # 大于1的为黑色标签
+
+p
+ggsave("gsva_bar.pdf",p,width = 8,height  = 8)
