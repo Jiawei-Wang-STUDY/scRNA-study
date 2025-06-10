@@ -37,7 +37,7 @@ library(org.Hs.eg.db)
 library(clusterProfiler)
 degs.list=rownames(deg)
 
-
+#方法一
 #BP富集分析
 erich.go.BP = enrichGO(gene =degs.list,
                        OrgDb = org.Hs.eg.db,
@@ -98,7 +98,7 @@ dotplot(erich.kegg.res)
 zzh=erich.kegg.res@result
 write.table(zzh,"erich.kegg.res.txt",sep = "\t",col.names = NA)
 
-
+#方法二
 ###通用方法###
 library(msigdbr)
 msigdbr::msigdbr_species()#看物种
@@ -111,16 +111,16 @@ library(clusterProfiler)
 kegg_genesets=read.gmt("c2.cp.kegg_medicus.v2024.1.Hs.symbols.gmt")
 # kegg_list <- split(kegg_genesets$entrez_gene, kegg_genesets$gs_name)
 #kegg_list <- split(kegg_genesets$gene_symbol, kegg_genesets$gs_name)
-kegg_list <- split(kegg_genesets$gene, kegg_genesets$term)#注意gene和term的顺序
-
+kegg_list <- split(kegg_genesets$gene, kegg_genesets$term)#注意gene和term的顺序，这里反了
+m_df<-kegg_list
 
 erich.kegg.msi=enricher(degs.list,TERM2GENE =m_df )
 dotplot(erich.kegg.msi,showCategory = 8)
 
 write.table(erich.kegg.msi@result,"erich.kegg.res.txt",sep = "\t",col.names = NA)
 
-
-kegg=read.table("11.16.res.txt",header = T,sep = "\t")
+####自定义画气泡图#####
+kegg=read.table("erich.kegg.res.txt",header = T,sep = "\t")
 View(kegg)
 
 k = data.frame(kegg)
@@ -159,6 +159,7 @@ k %>%
         axis.title.y = element_text(angle=90))
 
 ###################################################################################
+#个性化画图——圆形汇总
 erich.go.BP=erich.go.BP@result
 
 colnames(erich.go.BP)
