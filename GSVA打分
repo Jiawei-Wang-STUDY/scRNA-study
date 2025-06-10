@@ -77,13 +77,33 @@ pheatmap::pheatmap(GSVA_hall[1:30,], #热图的数据
                    show_colnames=T,
                    scale = "row", #以行来标准化，这个功能很不错
                    color =colorRampPalette(c("#FF7744", "white","#AAAAAA","#0044BB"))(100))
-
-
-###########################################################
-###########################################################
-###########################################################
-
 #不用样本里面不同细胞类型通路富集分析
+m_df<- msigdbr(species = "human",  category = "H" )
+geneSets <- m_df %>% split(x = .$gene_symbol, f = .$gs_name)
+exp=AverageExpression(scRNA_harmony,add.ident = "orig.ident") 
+exp=exp[["RNA"]]
+
+counts2=exp[,c(1:6)]
+
+GSVA_hall <- gsva(expr=as.matrix(counts2), 
+                  gset.idx.list=geneSets, 
+                  mx.diff=T, # 数据为正态分布则T，双峰则F
+                  kcdf="Poisson", #CPM, RPKM, TPM数据就用默认值"Gaussian"， read count数据则为"Poisson"，
+                  parallel.sz=4) # 并行线程数目
+head(GSVA_hall)
+
+pheatmap::pheatmap(GSVA_hall, #热图的数据
+                   cluster_rows = T,#行聚类
+                   cluster_cols =T,#列聚类，可以看出样本之间的区分度
+
+                   show_colnames=T,
+                   scale = "row", #以行来标准化，这个功能很不错
+                   color =colorRampPalette(c("#FF7744", "white","#AAAAAA","#0044BB"))(100))
+###########################################################
+###########################################################
+###########################################################
+
+
 library('GSEABase')
 library(GSVA)
 library(msigdbr)
