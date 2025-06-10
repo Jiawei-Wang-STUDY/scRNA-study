@@ -1,0 +1,142 @@
+##系统报错改为英文
+Sys.setenv(LANGUAGE = "en")
+##禁止转化为因子
+options(stringsAsFactors = FALSE)
+##清空环境
+rm(list=ls())
+
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(reshape2)
+library(RColorBrewer)
+library(ggplot2)
+library(ggrepel)  
+library(magrittr)
+library(data.table)
+library(tidyverse)
+
+setwd("E:\\super.lesson\\s8/")
+load("anno.scRNA_harmony.rdata")
+
+scRNA_harmony@meta.data[which(scRNA_harmony@meta.data$orig.ident=="s1"),"group.3"]="c"
+scRNA_harmony@meta.data[which(scRNA_harmony@meta.data$orig.ident=="s2"),"group.3"]="c"
+scRNA_harmony@meta.data[which(scRNA_harmony@meta.data$orig.ident=="s3"),"group.3"]="t"
+scRNA_harmony@meta.data[which(scRNA_harmony@meta.data$orig.ident=="s4"),"group.3"]="t"
+DimPlot(scRNA_harmony,split.by = "group.3",group.by = "celltype.3")
+
+setwd("E:\\super.lesson\\s10/deg/")
+
+library(clusterProfiler)
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+library(R.utils)
+R.utils::setOption("clusterProfiler.download.method","auto")
+
+
+r.deg=data.frame()
+
+sc.n=scRNA_harmony
+table(sc.n@meta.data$group.3)
+table(sc.n@meta.data$celltype.3)
+Idents(sc.n)="celltype.3"
+
+deg.l=list()
+
+type=as.character(unique(sc.n@meta.data$celltype.3)) 
+
+for (i in c(1:7)) {
+  Idents(sc.n)="celltype.3"
+  deg=FindMarkers(sc.n,ident.1 = "t",ident.2 = "c",min.pct = 0.25,
+                  logfc.threshold = 0.25,
+                  group.by = "group.3",subset.ident =type[i]   )
+
+  deg=filter(deg,p_val<0.05)
+
+
+  deg.l[[i]]=rownames(deg)
+
+  write.csv(deg,file = paste0( type[i],'deg.csv') )
+  deg$celltype=type[i]
+  deg$unm=i-1
+  deg$gene=rownames(deg)
+  r.deg=rbind(deg,r.deg)
+
+}
+names(deg.l)=type
+?compareCluster
+xx <- compareCluster(geneCluster= deg.l, fun="enrichGO",  
+                     OrgDb = org.Hs.eg.db,
+                     keyType = "SYMBOL",
+                     ont = "BP")
+library(DOSE)
+library(enrichplot)              
+xx1 <- pairwise_termsim(xx)                     
+p1 <- emapplot(xx1, showCategory = 10)
+?emapplot
+p1
+
+ggsave(filename = "go.celltype7.pdf", plot = p1, width = 11, height = 11,dpi = 300)
+ggsave(filename = "go.celltype7.tiff", plot = p1, width = 11, height = 11,dpi = 300)
+
+
+
+
+p2 <-dotplot(xx) + theme(axis.text.x = element_text(angle=45, hjust=1),
+                         axis.text.y = element_text(size=12),
+                         panel.spacing = unit(5, "mm"))+
+  scale_colour_gradientn(colours =c("#E54924","#498EA4"))
+p2
+
+ggsave(file="BP.pdf",height= 15,width = 8)
+
+
+
+scs=subset(scRNA_harmony,downsample=100)
+marker=FindAllMarkers(scs,logfc.threshold = 0.5,only.pos = T,min.pct = 0.5)
+#筛选每个聚类中前 20 个基因
+top20 <- marker |>
+  dplyr::group_by(cluster) |>
+  dplyr::filter(avg_log2FC > 1) |>
+  dplyr::slice_head(n = 50) |>
+  dplyr::ungroup()
+
+colnames(top20)
+#基因富集分析
+
+kk <- compareCluster(gene~cluster, data = top20, fun="enrichGO",   
+                     OrgDb = org.Hs.eg.db,
+                     keyType = "SYMBOL",
+                     ont = "BP")
+
+
+kk <- compareCluster(gene~cluster, data = top20,
+                     OrgDb = org.Hs.eg.db,fun="enrichGO")
+
+
+g <- dotplot(kk, label_format=100) + 
+  aes(x=sub("\n.*", "", Cluster)) + 
+  xlab("Cell Clusters") +
+  ggtitle(NULL) +
+  theme(axis.text.x = element_text(angle=30, hjust=1,size=10),
+        axis.text.y = element_text(size=8))
+g
+
+##BiocManager::install("ggsc")
+library(ggsc)
+#BiocManager::install("BiocFileCache")
+library(aplot)
+p <- sc_dim(scRNA_harmony) + 
+  sc_dim_geom_label(
+    geom = shadowtext::geom_shadowtext, #用于绘制带阴影背景的文本，增加标签的可读性
+    color='black', #设置标签文本的颜色为黑色
+    bg.color='white') #设置标签文本背景阴影的颜色为白色
+p
+
+p2 <- sc_dim_count(p)
+
+p3 <- p2 + coord_cartesian() + 
+  ggfun::theme_noxaxis() + 
+  xlab(NULL) 
+p3
+insert_top(g, p3, height=.25)
