@@ -30,12 +30,15 @@ setwd("E:\\super.lesson\\s10/")
 deg=FindMarkers(scRNA_harmony,subset.ident = "Tcells",ident.1 = "t",ident.2 = "c",
                 group.by = "group.3", min.pct = 0.25 )
 
-
+#过表征通路富集
 
 ##BiocManager::install("org.Mm.eg.db")
 library(org.Hs.eg.db)
 library(clusterProfiler)
 degs.list=rownames(deg)
+
+
+#BP富集分析
 erich.go.BP = enrichGO(gene =degs.list,
                        OrgDb = org.Hs.eg.db,
                        keyType = "SYMBOL",
@@ -48,13 +51,14 @@ dotplot(erich.go.BP,showCategory = 15)
 
 categorys <- c("cytoplasmic translation", "viral process",
                "protein folding")
-dotplot(erich.go.BP, showCategory = categorys)
+dotplot(erich.go.BP, showCategory = categorys)#看两个值，geneRatio和FDR
 
-?dotplot
 barplot(erich.go.BP,showCategory = 8)
-erich.go.BP=erich.go.BP@result
-write.table(erich.go.BP,"erich.go.BP.deg.con.hf.txt",sep = "\t",col.names = NA)
 
+erich.go.BP=erich.go.BP@result
+write.table(erich.go.BP,"erich.go.BP.deg.con.hf.txt",sep = "\t",col.names = NA)#保存结果
+
+#cc富集
 erich.go.CC = enrichGO(gene =degs.list,
                        OrgDb = org.Hs.eg.db,
                        keyType = "SYMBOL",
@@ -62,9 +66,9 @@ erich.go.CC = enrichGO(gene =degs.list,
                        pvalueCutoff = 0.5,
                        qvalueCutoff = 0.5)
 dotplot(erich.go.CC,showCategory = 8)
-?dotplot
 barplot(erich.go.CC,showCategory = 8)
 
+#MF富集
 erich.go.MF = enrichGO(gene =degs.list,
                        OrgDb = org.Hs.eg.db,
                        keyType = "SYMBOL",
@@ -72,10 +76,12 @@ erich.go.MF = enrichGO(gene =degs.list,
                        pvalueCutoff = 0.5,
                        qvalueCutoff = 0.5)
 dotplot(erich.go.MF,showCategory = 8)
-?dotplot
+
 barplot(erich.go.MF,showCategory = 8)
 
 
+
+#kegg富集，注意需要转换成entrez_id
 keytypes(org.Hs.eg.db)
 
 DEG.entrez_id = mapIds(x = org.Hs.eg.db,
@@ -83,7 +89,7 @@ DEG.entrez_id = mapIds(x = org.Hs.eg.db,
                        keytype = "SYMBOL",
                        column = "ENTREZID")
 
-?enrichKEGG
+
 erich.kegg.res <- enrichKEGG(gene = DEG.entrez_id,
                              organism = "hsa",
                              keyType = "kegg")
@@ -93,12 +99,21 @@ zzh=erich.kegg.res@result
 write.table(zzh,"erich.kegg.res.txt",sep = "\t",col.names = NA)
 
 
-
+###通用方法###
 library(msigdbr)
-msigdbr::msigdbr_species()
-msigdbr::msigdbr_collections()
-m_df<- msigdbr(species = "Homo sapiens",  category = "H" )
-m_df = m_df[,c(9,4)]
+msigdbr::msigdbr_species()#看物种
+msigdbr::msigdbr_collections()#看基因集
+#m_df<- msigdbr(species = "Homo sapiens",  category = "H" )
+#m_df = m_df[,c(9,4)]
+#注意上面两步可能会报错，有替代方法
+#BiocManager::install("clusterProfiler")
+library(clusterProfiler)
+kegg_genesets=read.gmt("c2.cp.kegg_medicus.v2024.1.Hs.symbols.gmt")
+# kegg_list <- split(kegg_genesets$entrez_gene, kegg_genesets$gs_name)
+#kegg_list <- split(kegg_genesets$gene_symbol, kegg_genesets$gs_name)
+kegg_list <- split(kegg_genesets$gene, kegg_genesets$term)#注意gene和term的顺序
+
+
 erich.kegg.msi=enricher(degs.list,TERM2GENE =m_df )
 dotplot(erich.kegg.msi,showCategory = 8)
 
