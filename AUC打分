@@ -1,0 +1,86 @@
+##系统报错改为英文
+Sys.setenv(LANGUAGE = "en")
+##禁止转化为因子
+options(stringsAsFactors = FALSE)
+##清空环境
+rm(list=ls())
+
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(reshape2)
+library(RColorBrewer)
+library(ggplot2)
+library(ggrepel)  
+library(magrittr)
+library(data.table)
+library(tidyverse)
+
+setwd("E:\\super.lesson\\s8/")
+load("anno.scRNA_harmony.rdata")
+
+scRNA_harmony@meta.data[which(scRNA_harmony@meta.data$orig.ident=="s1"),"group.3"]="c"
+scRNA_harmony@meta.data[which(scRNA_harmony@meta.data$orig.ident=="s2"),"group.3"]="c"
+scRNA_harmony@meta.data[which(scRNA_harmony@meta.data$orig.ident=="s3"),"group.3"]="t"
+scRNA_harmony@meta.data[which(scRNA_harmony@meta.data$orig.ident=="s4"),"group.3"]="t"
+DimPlot(scRNA_harmony,split.by = "group.3",group.by = "celltype.3")
+
+setwd("E:\\super.lesson\\s10/")
+
+options(BioC_mirror="https://mirrors.westlake.edu.cn/bioconductor")
+## BiocManager::install("AUCell")
+library(AUCell)
+library(ggplot2)
+library(Seurat)
+library(clusterProfiler)
+
+sc.id=sample(colnames(scRNA_harmony),3000)
+sc2=scRNA_harmony[,sc.id]
+
+cells_rankings <- AUCell_buildRankings(GetAssayData(sc2,slot = "data"), 
+                                       nCores=6, plotStats=TRUE)
+
+c2 <- read.gmt("c2.cp.kegg.v7.5.1.symbols.gmt")
+
+geneSets <- lapply(unique(c2$term), function(x){print(x);c2$gene[c2$term == x]})
+names(geneSets) <- unique(c2$term)
+
+cells_AUC <- AUCell_calcAUC(geneSets, cells_rankings,nCores =1, aucMaxRank=nrow(cells_rankings)*0.1)
+
+grep("OX",rownames(cells_AUC@assays@data$AUC),value = T)
+
+geneSet <- "KEGG_OXIDATIVE_PHOSPHORYLATION"
+aucs <- as.numeric(getAUC(cells_AUC)[geneSet, ])
+
+
+sc2$AUC <- aucs
+df<- data.frame(sc2@meta.data, sc2@reductions$umap@cell.embeddings)
+
+
+colnames(df)
+class_avg <- df %>%
+  group_by( seurat_clusters) %>%
+  summarise(
+    umap_1 = median(umap_1),
+    umap_2 = median(umap_2)
+  )
+
+ggplot(df, aes(umap_1, umap_2))  +
+  geom_point(aes(colour  = AUC)) + viridis::scale_color_viridis(option="E") +
+  ggrepel::geom_label_repel(aes(label = seurat_clusters),
+                            data = class_avg,
+                            size = 5,
+                            label.size = 1,
+                            segment.color = NA
+  )+   theme(legend.position = "none") + theme_bw()
+
+
+library(viridis)
+
+png("Gene Set Activity.png", res=300, height=2000, width=4000)
+ggplot(df, aes(umap_1, umap_2, color=AUC)
+) + geom_point( size=1.5
+) + scale_color_viridis(option="A")  + 
+  theme_light(base_size = 26) + facet_grid(.~group.3)
+
+dev.off()
