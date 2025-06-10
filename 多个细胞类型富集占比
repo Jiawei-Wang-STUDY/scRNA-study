@@ -72,6 +72,7 @@ xx <- compareCluster(geneCluster= deg.l, fun="enrichGO",
 library(DOSE)
 library(enrichplot)              
 xx1 <- pairwise_termsim(xx)                     
+#饼图
 p1 <- emapplot(xx1, showCategory = 10)
 ?emapplot
 p1
@@ -81,7 +82,7 @@ ggsave(filename = "go.celltype7.tiff", plot = p1, width = 11, height = 11,dpi = 
 
 
 
-
+#气泡图
 p2 <-dotplot(xx) + theme(axis.text.x = element_text(angle=45, hjust=1),
                          axis.text.y = element_text(size=12),
                          panel.spacing = unit(5, "mm"))+
