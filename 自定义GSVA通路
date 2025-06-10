@@ -1,0 +1,19 @@
+############另外一种gmt读取方法
+###自定义基因集的gsva
+
+gene.set=read.table("gene.txt",
+                    header =F,sep = '\t',quote = '')
+kegg.123=read.table("genesetname.txt",
+                    header =F,sep = '\t',quote = '')
+gene.set1=as.matrix(gene.set)
+gene.set2=t(gene.set1)
+gmt=list()
+for (i in 1:19) {
+  y=as.character(gene.set2[,i]) 
+  b=which(y=="")
+  gmt[[i]]=y[-b]
+}
+names(gmt)=kegg.123$V1
+gmt=gmt[-19]
+
+View(gmt)
