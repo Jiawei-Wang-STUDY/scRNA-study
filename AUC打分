@@ -34,7 +34,7 @@ library(ggplot2)
 library(Seurat)
 library(clusterProfiler)
 
-sc.id=sample(colnames(scRNA_harmony),3000)
+sc.id=sample(colnames(scRNA_harmony),3000)#自己做的时候不需要抽取
 sc2=scRNA_harmony[,sc.id]
 
 cells_rankings <- AUCell_buildRankings(GetAssayData(sc2,slot = "data"), 
@@ -81,6 +81,6 @@ png("Gene Set Activity.png", res=300, height=2000, width=4000)
 ggplot(df, aes(umap_1, umap_2, color=AUC)
 ) + geom_point( size=1.5
 ) + scale_color_viridis(option="A")  + 
-  theme_light(base_size = 26) + facet_grid(.~group.3)
+  theme_light(base_size = 26) + facet_grid(.~group.3)#facet参数的意思是分组展示
 
 dev.off()
